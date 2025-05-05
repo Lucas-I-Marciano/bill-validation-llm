@@ -1,4 +1,3 @@
-// src/errors/ConflictError.ts (Novo)
 import { AppError } from "./AppError.js"; // Verifique extensão
 
 export class ConflictError extends AppError {
