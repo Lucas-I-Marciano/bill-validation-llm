@@ -10,3 +10,11 @@ Instruções:
 * Retorne a resposta EXCLUSIVAMENTE como um objeto JSON válido, contendo as chaves \`valor_total\` (para o valor numérico ou string formatada como número, ex: 123.45 ou "123,45") e \`mes_referencia\` (para o mês/período como string, ex: "Maio/2025" ou "05/2025").
 * Se uma das informações não puder ser encontrada de forma confiável, utilize \`null\` como valor para a chave correspondente.
 * Não inclua nenhuma outra explicação ou texto adicional na sua resposta, apenas o JSON.`;
+
+import path, { dirname } from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+export const UPLOAD_DIR = path.join(__dirname, "..", "..", "uploads");
