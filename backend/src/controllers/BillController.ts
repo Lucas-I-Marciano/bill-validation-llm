@@ -5,6 +5,7 @@ import { UploadBillDto } from "../dtos/UploadBill.dto.js"; // Verifique extensã
 import { BillAnalysisService } from "../services/BillAnalysisService.js"; // Verifique extensão .js
 
 import { GeminiService } from "../services/GeminiService.js";
+import { AppError } from "../errors/AppError.js";
 const geminiService = new GeminiService();
 const billAnalysisService = new BillAnalysisService(geminiService);
 
@@ -24,13 +25,19 @@ export class BillController {
     const errors = await validate(uploadData);
     if (errors.length > 0) {
       console.error("[BillController] Erros de validação:", errors);
-      const formattedErrors = errors.map((err) => ({
-        property: err.property,
-        constraints: err.constraints,
-      }));
+      const errorDescription = errors
+        .map(
+          (err) =>
+            `${err.property}: ${Object.values(err.constraints || {}).join(
+              ", "
+            )}`
+        )
+        .join("; ");
+
       res.status(400).json({
-        message: "Dados de entrada inválidos.",
-        errors: formattedErrors,
+        error_code: "INVALID_DATA",
+        // Incluir detalhes no error_description
+        error_description: `Dados de entrada inválidos. Detalhes: ${errorDescription}`,
       });
       return;
     }
@@ -46,7 +53,12 @@ export class BillController {
 
       console.log("[BillController] Análise concluída com sucesso.");
       // 4. Enviar Resposta de Sucesso
-      res.status(200).json(result);
+      res.status(200).json({
+        // Descrição: "Operação realizada com sucesso." (implícita pelo status 200 ou adicionar message)
+        image_url: result.imageUrl, // Veio do serviço
+        measure_value: result.measureValue, // Veio do serviço
+        measure_uuid: result.measureUuid, // Veio do serviço
+      });
     } catch (error) {
       console.error(
         "[BillController] Erro ao processar upload/análise:",
