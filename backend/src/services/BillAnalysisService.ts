@@ -189,21 +189,25 @@ export class BillAnalysisService {
     if (valorTotal === null || valorTotal === undefined) {
       return null;
     }
+    let parsed: number;
     if (typeof valorTotal === "number") {
-      return Math.round(valorTotal); // Arredonda se já for número
-    }
-    if (typeof valorTotal === "string") {
+      parsed = valorTotal;
+    } else if (typeof valorTotal === "string") {
       try {
-        // Tenta remover caracteres não numéricos (exceto ponto/vírgula) e converter
         const numericString = valorTotal
           .replace(",", ".")
           .replace(/[^\d.-]/g, "");
-        const parsed = parseFloat(numericString);
-        return isNaN(parsed) ? null : Math.round(parsed); // Arredonda após parse
+        parsed = parseFloat(numericString);
+        if (isNaN(parsed)) {
+          return null;
+        }
       } catch {
-        return null; // Retorna null se falhar a conversão
+        return null;
       }
+    } else {
+      return null; // Se não for string nem número
     }
-    return null;
+
+    return Math.round(parsed * 100) / 100;
   }
 }
