@@ -1,0 +1,38 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Definição do nosso enum para o tipo de medição
+enum MeasureType {
+  WATER
+  GAS
+}
+
+// Modelo para a tabela de leituras de conta
+model BillReading {
+  id               Int       @id @default(autoincrement()) // Chave primária auto-incrementável
+  measure_uuid     String    @unique // O UUID que você gera no serviço, marcado como único
+  customer_code    String
+  measure_datetime DateTime  // Data e hora da medição
+  measure_type     MeasureType // Usa o enum MeasureType definido acima
+  measure_value    Decimal?  // '?' torna o campo opcional (nullable)
+
+  original_ai_response String?   // Opcional: guardar a resposta bruta da IA para auditoria/debug
+  image_temp_filename  String?   // Opcional: nome do arquivo temporário processado (sem o path)
+
+  created_at       DateTime  @default(now()) // Data de criação do registro
+  updated_at       DateTime  @updatedAt      // Data da última atualização do registro
+
+  // @@index([customer_code, measure_type, measure_datetime]) // Exemplo de índice composto
+}
