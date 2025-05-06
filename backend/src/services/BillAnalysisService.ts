@@ -12,6 +12,9 @@ import {
 import { AppError } from "../errors/AppError.js";
 import { ConflictError } from "../errors/ConflictError.js";
 
+import prisma from "../config/prismaClient.js"; // Ajuste o path se você colocou em outro lugar
+import { MeasureType as PrismaMeasureType } from "@prisma/client";
+
 const existingRecords = new Set<string>();
 
 export class BillAnalysisService {
@@ -28,8 +31,9 @@ export class BillAnalysisService {
       "[BillAnalysisService] Iniciando handleUploadAndAnalysis para cliente:",
       data.customer_code
     );
+    const measureUuid = uuidv4(); // UUID para esta operação/leitura
     let tempFilePath: string | null = null;
-    const measureUuid = uuidv4();
+    let tempFilenameWithExt: string | null = null;
 
     try {
       // 0. Checar Duplicatas
@@ -108,11 +112,38 @@ export class BillAnalysisService {
       // 5. Combinar informações e retornar (Exemplo)
       const measureValue = this.parseMeasureValue(analysisResult.valor_total);
       const imageUrl = `/uploads/${tempFilename}`;
+      const measureValueFormattedString = this.parseMeasureValue(
+        analysisResult.valor_total
+      );
+
+      // 5. Salvar no Banco de Dados com Prisma
+      console.log(
+        "[BillAnalysisService] Salvando leitura no banco de dados..."
+      );
+      await prisma.billReading.create({
+        data: {
+          measure_uuid: measureUuid,
+          customer_code: data.customer_code,
+          measure_datetime: new Date(data.measure_datetime), // Converter string ISO para Date
+          measure_type: data.measure_type as PrismaMeasureType, // Cast para o enum do Prisma
+          measure_value: measureValueFormattedString, // Passa a string "XX.YY" ou null. Prisma/DB lida com Decimal.
+          original_ai_response: rawAnalysisText,
+          image_temp_filename: tempFilenameWithExt,
+        },
+      });
+      console.log(
+        `[BillAnalysisService] Leitura com UUID ${measureUuid} salva no banco.`
+      );
+
+      // 6. Preparar resposta de sucesso para o Controller
+      // ATENÇÃO: imageUrl é um caminho local/temporário, não uma URL pública real.
+      // Para uma URL real, você precisaria fazer upload para um cloud storage.
+      const imageUrlForResponse = `/uploads/${tempFilenameWithExt}`;
 
       console.log("[BillAnalysisService] Processamento concluído com sucesso.");
       return {
-        imageUrl: imageUrl,
-        measureValue: measureValue,
+        imageUrl: imageUrlForResponse,
+        measureValue: measureValueFormattedString, // A string formatada "XX.YY" ou null
         measureUuid: measureUuid,
       };
     } catch (error: any) {
@@ -120,7 +151,15 @@ export class BillAnalysisService {
         "[BillAnalysisService] Erro em handleUploadAndAnalysis:",
         error
       );
-      throw error;
+      // Relançar erros conhecidos (AppError, ConflictError) para serem tratados pelo errorHandler global
+      if (error instanceof AppError || error instanceof ConflictError) {
+        throw error;
+      }
+      // Encapsular erros inesperados em um AppError genérico
+      throw new AppError(
+        `Erro interno no serviço de análise: ${error.message}`,
+        500
+      );
     } finally {
       // 5. **IMPORTANTE:** Limpar o arquivo temporário
       if (tempFilePath) {
@@ -142,42 +181,43 @@ export class BillAnalysisService {
   private async checkForDuplicate(
     customerCode: string,
     measureType: string,
-    measureDate: string
+    measureDateISO: string
   ): Promise<void> {
     try {
-      const date = new Date(measureDate);
-      const year = date.getFullYear();
-      // getMonth() é 0-indexado, então adicionamos 1 e padStart para formatar MM
-      const month = (date.getMonth() + 1).toString().padStart(2, "0");
+      const dateObj = new Date(measureDateISO);
+      const year = dateObj.getFullYear();
+      const month = (dateObj.getMonth() + 1).toString().padStart(2, "0"); // Mês é 0-indexado
       const recordKey = `${customerCode}_${measureType}_${year}-${month}`;
 
       console.log(
-        `[BillAnalysisService] Checando duplicata para chave: ${recordKey}`
+        `[BillAnalysisService] Checando duplicata para chave (simulação): ${recordKey}`
       );
 
-      // Lógica REAL: await database.findRecord(recordKey);
-      if (existingRecords.has(recordKey)) {
+      const existing = await prisma.billReading.findFirst({
+        where: {
+          customer_code: customerCode,
+          measure_type: measureType as PrismaMeasureType, // Cast para o tipo do Prisma
+          measure_datetime: {
+            // Lógica para checar mês/ano
+            gte: new Date(year, dateObj.getMonth(), 1),
+            lt: new Date(year, dateObj.getMonth() + 1, 1),
+          },
+        },
+      });
+      if (existing) {
         console.warn(
-          `[BillAnalysisService] Duplicata encontrada: ${recordKey}`
+          `[BillAnalysisService] Duplicata REAL encontrada no DB para: ${recordKey}`
         );
-        throw new ConflictError(); // Lança o erro 409 específico
+        throw new ConflictError("Leitura do mês já realizada e registrada.");
       }
-
-      // Lógica REAL: Marcar como existente ou apenas não lançar erro
-      existingRecords.add(recordKey); // Adiciona ao nosso set de simulação
-      console.log(
-        `[BillAnalysisService] Chave ${recordKey} adicionada ao registro (simulação).`
-      );
     } catch (error) {
       if (error instanceof ConflictError) {
         throw error; // Relança o erro de conflito
       }
-      // Logar outros erros potenciais na validação da data, etc.
       console.error(
-        "[BillAnalysisService] Erro ao checar duplicata ou processar data:",
+        "[BillAnalysisService] Erro ao checar duplicata (simulação) ou processar data:",
         error
       );
-      // Lançar um erro genérico ou um AppError mais específico, se apropriado
       throw new AppError(
         "Erro interno ao verificar duplicidade de leitura.",
         500
@@ -185,7 +225,7 @@ export class BillAnalysisService {
     }
   }
 
-  private parseMeasureValue(valorTotal: string | number | null): number | null {
+  private parseMeasureValue(valorTotal: string | number | null): string | null {
     if (valorTotal === null || valorTotal === undefined) {
       return null;
     }
@@ -198,16 +238,13 @@ export class BillAnalysisService {
           .replace(",", ".")
           .replace(/[^\d.-]/g, "");
         parsed = parseFloat(numericString);
-        if (isNaN(parsed)) {
-          return null;
-        }
+        if (isNaN(parsed)) return null;
       } catch {
         return null;
       }
     } else {
-      return null; // Se não for string nem número
+      return null;
     }
-
-    return Math.round(parsed * 100) / 100;
+    return parsed.toFixed(2); // Retorna string formatada "XX.YY"
   }
 }
