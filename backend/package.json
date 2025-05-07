@@ -6,7 +6,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
     "start": "node --watch ./dist/server.js",
-    "dev": "node ./dist/server.js"
+    "dev": "node ./dist/server.js",
+    "start:dev": "cls && tsc && npm run start"
   },
   "repository": {
     "type": "git",
