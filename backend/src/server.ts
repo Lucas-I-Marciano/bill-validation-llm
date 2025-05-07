@@ -1,40 +1,9 @@
-// import path, { dirname } from "path";
-// import { fileURLToPath } from "url";
-// import fs from "fs";
-// import dotenv from "dotenv";
-// import { PROMPT_ANALYSE_BILL, UPLOAD_DIR } from "./config/index.js";
-// import { GeminiService } from "./services/GeminiService.js";
-// import { getJsonBlockWithNewlines } from "./utils/json-parser.js";
-
-// dotenv.config();
-
-// const image_path = path.join(UPLOAD_DIR, "teste.png");
-// if (!fs.existsSync(image_path)) {
-//   console.error(`Erro: Arquivo de imagem não encontrado em: ${image_path}`);
-//   process.exit(1); // Sair se a imagem não existir
-// }
-
-// const geminiService = new GeminiService();
-
-// async function main() {
-//   //   const response = await geminiService.analyzeImage(
-//   //     image_path,
-//   //     PROMPT_ANALYSE_BILL
-//   //   );
-//   //   console.log(response);
 //   const response = `\`\`\`json
 // {
 //     "valor_total": "115,06",
 //     "mes_referencia": "Abril/2025"
 // }
 // \`\`\``;
-//   const responseFormated = getJsonBlockWithNewlines(response);
-
-//   return responseFormated;
-// }
-
-// const a = await main();
-// console.log(a);
 
 import "reflect-metadata";
 import express, {
@@ -43,18 +12,22 @@ import express, {
   NextFunction,
   ErrorRequestHandler,
 } from "express";
-// import cors from 'cors';
+import cors from "cors";
 import "dotenv/config"; // Garante que dotenv carregue antes de tudo
 import mainRouter from "./routes/index.js"; // Importa o roteador principal - Verifique extensão .js
 import errorHandler from "./middlewares/errorHandler.js";
+import logger from "./middlewares/logger.js"; // Importa o middleware de logging
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middlewares Essenciais
-// app.use(cors()); // Habilita CORS para todas as origens (ajuste em produção!)
+app.use(cors()); // Habilita CORS para todas as origens (ajuste em produção!)
 app.use(express.json({ limit: "10mb" })); // Habilita parsing de JSON no body (aumente o limite se base64 for grande)
 app.use(express.urlencoded({ extended: true })); // Para parsing de application/x-www-form-urlencoded
+
+// Middleware de Logging
+app.use(logger); // Adiciona o middleware de logging
 
 // Rotas Principais (sem prefixo global aqui, o prefixo está dentro de routes/index.ts se necessário)
 app.use(mainRouter); // <<< USA O ROTEADOR PRINCIPAL AQUI
