@@ -34,7 +34,13 @@ app.use(mainRouter); // <<< USA O ROTEADOR PRINCIPAL AQUI
 
 // Rota "Not Found" (Opcional, mas bom ter)
 app.use((req, res, next) => {
-  res.status(404).json({ message: "Endpoint não encontrado." });
+  const timestamp = new Date().toISOString();
+  res.status(404).json({
+    status: "error",
+    message: "Endpoint não encontrado.",
+    timestamp: timestamp,
+    path: req.originalUrl, // Adiciona a URL que foi acessada
+  });
 });
 
 // Middleware Global de Tratamento de Erros (IMPORTANTE: Deve ser o ÚLTIMO middleware)
